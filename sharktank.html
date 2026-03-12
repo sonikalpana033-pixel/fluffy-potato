@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Shark Tank - 1% Club</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --primary-red: #ff3e3e; --dark-red: #8b0000; --black: #050505;
+            --text-white: #f0f0f0; --accent-gold: #ffd700; --glass: rgba(20, 20, 20, 0.7);
+            --border: rgba(142, 68, 173, 0.4); 
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+
+        body {
+            background-color: var(--black); color: var(--text-white);
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+            background: radial-gradient(circle at 50% 50%, #1a0515 0%, #000000 100%);
+            overflow-x: hidden;
+        }
+
+        .header-bar {
+            width: 100%; display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 30px; background: rgba(0,0,0,0.8); border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+        }
+
+        .container { width: 100%; max-width: 1100px; padding: 20px; display: grid; gap: 20px; }
+
+        .card {
+            background: var(--glass); backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 15px; padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;
+        }
+
+        h1 { color: #9b59b6; font-size: 2rem; text-transform: uppercase; letter-spacing: 2px; }
+        h2 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.5rem; }
+
+        .btn {
+            background: linear-gradient(135deg, #8e44ad, #9b59b6);
+            color: white; border: none; padding: 12px; font-size: 1rem; border-radius: 10px;
+            cursor: pointer; width: 100%; margin: 5px 0; font-weight: bold; text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+        .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(155, 89, 182, 0.5); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; background: #555; box-shadow: none; }
+        
+        .btn-secondary { background: transparent; border: 1px solid #aaa; color: #aaa; }
+        .btn-green { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .btn-red { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .btn-sell { background: transparent; border: 1px solid var(--accent-gold); color: var(--accent-gold); padding: 5px 10px; font-size: 0.8rem; border-radius: 5px; width: auto; display: inline-block; margin-top: 5px;}
+        .btn-sell:hover { background: var(--accent-gold); color: #000; }
+
+        .input-field {
+            width: 100%; padding: 14px; margin: 12px 0; background: rgba(0,0,0,0.4);
+            border: 1px solid #9b59b6; color: white; border-radius: 12px; font-size: 16px;
+            text-align: center; letter-spacing: 2px; text-transform: uppercase;
+        }
+        .input-field:focus { outline: none; box-shadow: 0 0 15px rgba(155, 89, 182, 0.4); }
+
+        .hidden { display: none !important; }
+
+        .dashboard { grid-template-columns: 1fr 2fr; display: grid; gap: 20px; }
+        @media (max-width: 768px) { .dashboard { grid-template-columns: 1fr; } }
+
+        .stats-box { text-align: left; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 10px; border: 1px solid #333; margin-bottom: 10px; }
+        .stat-val { color: #2ecc71; font-size: 1.5rem; font-weight: bold; transition: color 0.3s; }
+        
+        .pitch-card { border: 2px solid var(--accent-gold); padding: 20px; border-radius: 10px; background: rgba(255,215,0,0.05); position: relative; }
+        .sector-badge { display: inline-block; padding: 5px 10px; background: rgba(155, 89, 182, 0.2); color: #9b59b6; border-radius: 20px; font-size: 0.8rem; border: 1px solid #9b59b6; margin-bottom: 15px; }
+        
+        .shark-slots { position: absolute; top: 20px; right: 20px; font-size: 0.8rem; color: #aaa; background: rgba(0,0,0,0.8); padding: 5px 10px; border-radius: 10px; border: 1px solid #555; }
+
+        .player-list { display: flex; justify-content: space-around; margin-top: 20px; gap: 10px;}
+        .player-avatar { padding: 10px; background: #111; border-radius: 10px; flex: 1; border: 1px solid #333; }
+        .player-avatar.active { border-color: #2ecc71; }
+
+        .trade-banner {
+            background: linear-gradient(90deg, #b71540, #e55039); color: white; padding: 15px; border-radius: 10px;
+            margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 0 20px rgba(229, 80, 57, 0.5); border: 1px solid #f8c291; animation: flash 2s infinite alternate;
+        }
+        @keyframes flash { 0% { box-shadow: 0 0 10px rgba(229, 80, 57, 0.3); } 100% { box-shadow: 0 0 25px rgba(229, 80, 57, 0.8); } }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-box {
+            transform: scale(0.8) translateZ(30px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 90%; max-width: 400px;
+            border-color: #9b59b6; box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(155, 89, 182, 0.3); background: var(--glass); padding: 25px; border-radius: 15px; text-align: center; border: 1px solid #9b59b6;
+        }
+        .modal-overlay.active .modal-box { transform: scale(1) translateZ(30px); }
+    </style>
+</head>
+<body>
+  <div class="header-bar">
+    <h3 style="color: #9b59b6; margin: 0; letter-spacing: 2px;">SHARK TANK LIVE</h3>
+    <div id="game-status" style="color: #aaa;">Status: Disconnected</div>
+    <div style="color: var(--accent-gold); font-weight: bold; font-size: 1.2rem;">Time: <span id="timer-display">05:00</span></div>
+</div>
+
+<div class="container">
+    <div id="lobby-screen" class="card">
+        <h1>Student Shark Tank</h1>
+        <p style="color: #aaa; margin-bottom: 20px;">Live Trading & Real-Time Portfolio Volatility.</p>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <input type="text" id="room-code" class="input-field" placeholder="ROOM CODE (e.g. 1234)" maxlength="6">
+        </div>
+        <button class="btn" id="create-btn" onclick="joinMatchmaking(true)">Create New Room</button>
+        <button class="btn" id="join-btn" onclick="joinMatchmaking(false)" style="background: linear-gradient(135deg, #2980b9, #2c3e50);">Join Existing Room</button>
+        <button class="btn btn-secondary" onclick="window.location.href='index.html'">Back to Hub</button>
+        <div class="player-list" id="lobby-players"></div>
+        <p id="waiting-text" class="hidden" style="margin-top: 20px; color: var(--accent-gold); font-style: italic;">Waiting for 3 players to join...</p>
+    </div>
+
+    <div id="game-screen" class="dashboard hidden">
+        <div class="card" style="align-self: start;">
+            <h2>My Portfolio</h2>
+            <div class="stats-box">
+                <div>Liquid Cash</div>
+                <div class="stat-val" id="my-cash">$100,000</div>
+            </div>
+            <div class="stats-box">
+                <div>Total Net Worth</div>
+                <div class="stat-val" id="my-networth" style="color: var(--accent-gold);">$100,000</div>
+            </div>
+            <h3 style="margin-top: 20px; font-size: 1rem; color: #aaa;">Live Assets & P/L</h3>
+            <div id="my-investments" style="font-size: 0.9rem; color: #ddd; margin-top: 10px;"></div>
+        </div>
+
+        <div class="card" id="arena-card">
+            <div id="trade-banner" class="trade-banner hidden">
+                <div style="text-align: left;">
+                    <strong style="font-size: 1.1rem;">🚨 LIVE TRADE OFFER</strong><br>
+                    <span id="trade-text">Player is selling X for $Y</span>
+                </div>
+                <button class="btn btn-green" style="width: auto; padding: 10px 20px;" onclick="acceptTrade()">BUY NOW</button>
+            </div>
+
+            <h2 id="phase-title">Waiting for Pitches...</h2>
+            
+            <div id="pitch-container" class="pitch-card hidden">
+                <div class="shark-slots" id="shark-slots-display">0/2 Sharks Invested</div>
+                <div class="sector-badge" id="pitch-sector">Tech</div>
+                <h1 id="pitch-name" style="color: white; margin-bottom: 5px;">Startup Name</h1>
+                <p id="pitch-desc" style="color: #aaa; margin-bottom: 20px;">Description</p>
+                <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
+                    <div><span style="color:#888;">Current Valuation:</span> <br><strong style="font-size: 1.5rem; color: var(--accent-gold);" id="pitch-val">$50,000</strong></div>
+                    <div><span style="color:#888;">Equity Offered:</span> <br><strong style="font-size: 1.5rem;" id="pitch-equity">20%</strong></div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-invest" class="btn btn-green" onclick="investInStartup()">Invest Now</button>
+                    <button id="btn-pass" class="btn btn-red" onclick="passStartup()">Pass</button>
+                </div>
+            </div>
+            <div class="player-list" id="opponent-status" style="margin-top: 30px;"></div>
+        </div>
+    </div>
+
+    <div id="result-screen" class="card hidden">
+        <h1>Final Valuations</h1>
+        <p>The Trading Floor has closed.</p>
+        <div id="final-leaderboard" style="margin: 20px 0; text-align: left;"></div>
+        <button class="btn" onclick="window.location.reload()">Play Again</button>
+        <button class="btn btn-secondary" onclick="window.location.href='index.html'">Back to Hub</button>
+    </div>
+
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-title" style="color: #9b59b6; margin-bottom: 10px;">Notice</h2>
+            <p id="modal-message" style="margin-bottom: 25px; color: #ccc; font-size: 1.1rem;"></p>
+            <button id="modal-btn" class="btn">Acknowledge</button>
+        </div>
+    </div>
+
+    <div id="sell-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 style="color: var(--accent-gold); margin-bottom: 10px;">Sell Asset</h2>
+            <p id="sell-asset-name" style="color: #fff; margin-bottom: 5px;">Startup Name</p>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 15px;">Set your asking price to broadcast to other players.</p>
+            <input type="number" id="sell-price-input" class="input-field" placeholder="Ask Price ($)">
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-green" onclick="confirmSell()">Broadcast Offer</button>
+                <button class="btn btn-red" onclick="closeSellModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjvjdjzOazn3NMhFGl3kF8IkcUpgBuFl0",
+      authDomain: "rise-to-the-1-percent.firebaseapp.com",
+      projectId: "rise-to-the-1-percent",
+      storageBucket: "rise-to-the-1-percent.firebasestorage.app",
+      messagingSenderId: "250810896412",
+      appId: "1:250810896412:web:8179fafb6fa0598f0ecfd9",
+      measurementId: "G-JZ0C7HDB81"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function showGameAlert(title, message, callback = null) {
+        const modal = document.getElementById('custom-modal');
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-message').innerText = message;
+        modal.classList.add('active');
+        const btn = document.getElementById('modal-btn');
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.onclick = () => { modal.classList.remove('active'); if(callback) callback(); };
+    }
+
+    let myProfile = { name: "Guest_" + Math.floor(Math.random()*1000) };
+    let roomRef = null;
+    let playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+    let isHost = false;
+    let roomState = {};
+    let globalTimer = null;
+    let assetToSell = null;
+
+    const STARTING_CASH = 100000;
+    const GAME_TIME = 300; 
+    
+    const startups = [
+        { name: "Aura AI", sector: "Tech", desc: "Generative AI for automated jewelry ad reels.", val: 60000, equity: 30 },
+        { name: "EcoPack", sector: "Sustainability", desc: "Biodegradable packaging made from mushroom mycelium.", val: 45000, equity: 25 },
+        { name: "Lernr", sector: "EdTech", desc: "AI tutor that adapts to BCA syllabus structures.", val: 30000, equity: 15 },
+        { name: "DropFast", sector: "E-commerce", desc: "Drone-based hyper-local delivery grid.", val: 80000, equity: 40 },
+        { name: "MetaQuest", sector: "Gaming", desc: "VR MMO built on block-chain economics.", val: 120000, equity: 20 },
+        { name: "SolarSync", sector: "Sustainability", desc: "Smart software to optimize residential solar panels.", val: 55000, equity: 20 },
+        { name: "CyberShield", sector: "Tech", desc: "B2B endpoint security for small businesses.", val: 90000, equity: 35 },
+        { name: "SkillSwap", sector: "EdTech", desc: "Peer-to-peer university tutoring marketplace.", val: 25000, equity: 10 },
+        { name: "LootBox", sector: "Gaming", desc: "Subscription box for indie game developers.", val: 40000, equity: 30 },
+        { name: "TrendTrove", sector: "E-commerce", desc: "AI tool predicting next month's fashion trends.", val: 70000, equity: 25 }
+    ];
+
+    window.onload = () => {
+        let savedData = localStorage.getItem("1percentProfile");
+        if (savedData) myProfile = JSON.parse(savedData);
+    };
+
+    function joinMatchmaking(isCreating) {
+        let roomCode = document.getElementById("room-code").value.trim().toUpperCase();
+        if(!roomCode) return showGameAlert("Input Error", "Please enter a 4-6 letter Room Code.");
+        
+        document.getElementById("create-btn").disabled = true; document.getElementById("join-btn").disabled = true; document.getElementById("waiting-text").classList.remove("hidden");
+        roomRef = db.ref('multiplayer_rooms/' + roomCode);
+
+        roomRef.once('value', snapshot => {
+            let room = snapshot.val();
+            if (isCreating) {
+                if (room && room.phase !== "finished") {
+                    document.getElementById("create-btn").disabled = false; document.getElementById("join-btn").disabled = false; document.getElementById("waiting-text").classList.add("hidden");
+                    return showGameAlert("Room Exists", "This room code is already active. Try joining it instead.");
+                }
+                let initialMarket = {};
+                startups.forEach(s => initialMarket[s.name] = 1.0);
+                isHost = true;
+                roomRef.set({
+                    phase: "lobby", timeRemaining: GAME_TIME, currentPitchIndex: -1, currentInvestors: [],
+                    marketModifiers: initialMarket, tradeOffer: null,
+                    players: { [playerId]: { name: myProfile.name, cash: STARTING_CASH, networth: STARTING_CASH, investments: {} } }
+                });
+            } else {
+                if (!room || room.phase === "finished") {
+                    document.getElementById("create-btn").disabled = false; document.getElementById("join-btn").disabled = false; document.getElementById("waiting-text").classList.add("hidden");
+                    return showGameAlert("Not Found", "Room does not exist or has finished.");
+                }
+                if (Object.keys(room.players || {}).length >= 3) {
+                    document.getElementById("create-btn").disabled = false; document.getElementById("join-btn").disabled = false; document.getElementById("waiting-text").classList.add("hidden");
+                    return showGameAlert("Room Full", "This Shark Tank already has 3 players.");
+                }
+                roomRef.child('players/' + playerId).set({ name: myProfile.name, cash: STARTING_CASH, networth: STARTING_CASH, investments: {} });
+            }
+            listenToRoom();
+        });
+    }
+
+    function listenToRoom() {
+        roomRef.on('value', snapshot => {
+            roomState = snapshot.val();
+            if (!roomState) return;
+            updateUI();
+            if (isHost) {
+                let players = roomState.players || {};
+                let playerCount = Object.keys(players).length;
+                if (roomState.phase === "lobby" && playerCount === 3) {
+                    roomRef.update({ phase: "pitching", currentPitchIndex: 0, currentInvestors: [] });
+                    startHostTimer();
+                }
+            }
+        });
+        roomRef.child('players/' + playerId).onDisconnect().remove();
+    }
+
+    function startHostTimer() {
+        globalTimer = setInterval(() => {
+            if (roomState.timeRemaining <= 0) {
+                clearInterval(globalTimer); roomRef.update({ phase: "finished" }); return;
+            }
+            let newTime = roomState.timeRemaining - 1;
+            let updates = { timeRemaining: newTime };
+            let players = roomState.players || {};
+
+            if (roomState.currentPitchIndex >= startups.length) {
+                if (newTime > 10) updates.timeRemaining = 10; 
+                roomRef.update(updates); return;
+            }
+
+            let actedCount = Object.values(players).filter(p => p.action === "Invested!" || p.action === "Passed").length;
+            if (actedCount === 3 && newTime > 5 && roomState.phase === "pitching") {
+                updates.timeRemaining = 5; 
+            }
+
+            if (newTime % 3 === 0) {
+                let randomStartup = startups[Math.floor(Math.random() * startups.length)].name;
+                let currentMod = roomState.marketModifiers[randomStartup];
+                let fluctuation = 0.85 + (Math.random() * 0.3); 
+                updates[`marketModifiers/${randomStartup}`] = Math.max(0.1, currentMod * fluctuation);
+            }
+
+            if (newTime % 20 === 0 && roomState.phase === "pitching") {
+                updates.currentPitchIndex = roomState.currentPitchIndex + 1;
+                updates.currentInvestors = []; 
+                for (let p in players) { updates[`players/${p}/action`] = "Waiting..."; }
+            }
+            roomRef.update(updates);
+        }, 1000);
+    }
+
+    function updateUI() {
+        let players = roomState.players || {};
+        let marketMods = roomState.marketModifiers || {};
+        let playerCount = Object.keys(players).length;
+        let mins = Math.floor(roomState.timeRemaining / 60);
+        let secs = roomState.timeRemaining % 60;
+        document.getElementById("timer-display").innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+        if (roomState.phase === "lobby") {
+            document.getElementById("game-status").innerText = `Lobby (${playerCount}/3 Sharks)`;
+            let lobbyHTML = "";
+            for (let p in players) lobbyHTML += `<div class="player-avatar active"><strong>${players[p].name}</strong><br>Ready</div>`;
+            document.getElementById("lobby-players").innerHTML = lobbyHTML;
+        } 
+        
+        if (roomState.phase !== "lobby" && document.getElementById("lobby-screen").classList.contains("hidden") === false) {
+            document.getElementById("lobby-screen").classList.add("hidden"); document.getElementById("game-screen").classList.remove("hidden");
+        }
+
+        let offer = roomState.tradeOffer;
+        if (offer && offer.sellerId !== playerId) {
+            document.getElementById("trade-banner").classList.remove("hidden");
+            document.getElementById("trade-text").innerHTML = `<strong>${offer.sellerName}</strong> is selling ${offer.equity}% of <strong>${offer.startup}</strong> for <strong style="color:var(--accent-gold);">$${offer.price.toLocaleString()}</strong>`;
+        } else { document.getElementById("trade-banner").classList.add("hidden"); }
+
+        if (players[playerId]) {
+            let myData = players[playerId];
+            let liveNetWorth = myData.cash;
+            document.getElementById("my-cash").innerText = `$${Math.floor(myData.cash).toLocaleString()}`;
+            
+            let invHTML = "";
+            for(let key in myData.investments) {
+                let inv = myData.investments[key];
+                let liveValue = inv.costPaid * (marketMods[inv.name] || 1.0);
+                liveNetWorth += liveValue;
+                let pnl = liveValue - inv.costPaid; 
+                let pnlDisplay = pnl >= 0 ? `<span style="color:#2ecc71">+$${Math.floor(pnl).toLocaleString()}</span>` : `<span style="color:#e74c3c">-$${Math.abs(Math.floor(pnl)).toLocaleString()}</span>`;
+                
+                invHTML += `<div style="margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #333;">
+                    <strong>${inv.name}</strong> (${inv.equity}%)<br>
+                    Live Val: $${Math.floor(liveValue).toLocaleString()} | P/L: ${pnlDisplay}<br>
+                    <button class="btn-sell" onclick="openSellModal('${inv.name}')">Sell Asset</button>
+                </div>`;
+            }
+            document.getElementById("my-investments").innerHTML = invHTML || "No portfolio assets.";
+            document.getElementById("my-networth").innerText = `$${Math.floor(liveNetWorth).toLocaleString()}`;
+            roomRef.child(`players/${playerId}`).update({ networth: liveNetWorth });
+        }
+
+        let oppHTML = "";
+        for (let p in players) {
+            if (p !== playerId) {
+                let act = players[p].action || "Waiting...";
+                oppHTML += `<div class="player-avatar"><strong>${players[p].name}</strong><br><span style="color:#aaa">$${Math.floor(players[p].networth).toLocaleString()}</span><br><span style="font-size:0.8rem; color:var(--accent-gold);">${act}</span></div>`;
+            }
+        }
+        document.getElementById("opponent-status").innerHTML = oppHTML;
+
+        if (roomState.phase === "pitching") {
+            if (roomState.currentPitchIndex >= startups.length) {
+                document.getElementById("phase-title").innerText = "Market Closing...";
+                document.getElementById("pitch-container").classList.add("hidden");
+                document.getElementById("game-status").innerText = "Tallying Results";
+            } else {
+                document.getElementById("game-status").innerText = "Live: Pitch Phase";
+                document.getElementById("pitch-container").classList.remove("hidden");
+                
+                let currentPitch = startups[roomState.currentPitchIndex];
+                let investedCount = (roomState.currentInvestors || []).length;
+                let myAction = players[playerId]?.action;
+                
+                document.getElementById("phase-title").innerText = `Pitch ${roomState.currentPitchIndex + 1}/10`;
+                document.getElementById("pitch-name").innerText = currentPitch.name;
+                document.getElementById("pitch-sector").innerText = currentPitch.sector;
+                document.getElementById("pitch-desc").innerText = currentPitch.desc;
+                
+                let currentLiveVal = currentPitch.val * (marketMods[currentPitch.name] || 1.0);
+                document.getElementById("pitch-val").innerText = `$${Math.floor(currentLiveVal).toLocaleString()}`;
+                document.getElementById("pitch-equity").innerText = `${currentPitch.equity}%`;
+                document.getElementById("shark-slots-display").innerText = `${investedCount}/2 Sharks Invested`;
+                
+                let btnInvest = document.getElementById("btn-invest"); let btnPass = document.getElementById("btn-pass");
+
+                if (myAction === "Invested!" || myAction === "Passed") {
+                    btnInvest.disabled = true; btnPass.disabled = true; btnInvest.innerText = myAction === "Invested!" ? "You Invested" : "Invest Now";
+                } else if (investedCount >= 2) {
+                    btnInvest.innerText = "Deal Closed"; btnInvest.disabled = true; document.getElementById("shark-slots-display").style.color = "#e74c3c";
+                } else {
+                    btnInvest.innerText = "Invest Now"; btnInvest.disabled = false; btnPass.disabled = false; document.getElementById("shark-slots-display").style.color = "#aaa";
+                }
+            }
+        }
+
+        if (roomState.phase === "finished") {
+            document.getElementById("game-screen").classList.add("hidden");
+            document.getElementById("result-screen").classList.remove("hidden");
+            document.getElementById("game-status").innerText = "Market Closed";
+            
+            let finalPlayers = Object.values(players).sort((a,b) => b.networth - a.networth);
+            let boardHTML = "";
+            finalPlayers.forEach((p, i) => {
+                let medal = i === 0 ? "🏆" : (i === 1 ? "🥈" : "🥉");
+                boardHTML += `<div class="stats-box" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size: 1.2rem;">${medal} <strong>${p.name}</strong></span>
+                    <span style="color:var(--accent-gold); font-size: 1.5rem; font-weight:bold;">$${Math.floor(p.networth).toLocaleString()}</span>
+                </div>`;
+            });
+            document.getElementById("final-leaderboard").innerHTML = boardHTML;
+        }
+    }
+
+    function investInStartup() {
+        let currentPitch = startups[roomState.currentPitchIndex];
+        let myData = roomState.players[playerId];
+        let liveVal = currentPitch.val * (roomState.marketModifiers[currentPitch.name] || 1.0);
+        let currentInvestors = roomState.currentInvestors || [];
+
+        if (currentInvestors.length >= 2) return showGameAlert("Deal Closed", "You were too slow! Two sharks have already taken this deal.");
+        if (myData.cash < liveVal) return showGameAlert("Insufficient Funds", `You need $${Math.floor(liveVal).toLocaleString()} in liquid cash to make this investment.`);
+
+        let newCash = myData.cash - liveVal; let updatedInvestors = [...currentInvestors, playerId];
+
+        roomRef.update({ currentInvestors: updatedInvestors });
+        roomRef.child(`players/${playerId}`).update({ cash: newCash, action: "Invested!" });
+        roomRef.child(`players/${playerId}/investments/${currentPitch.name}`).set({
+            name: currentPitch.name, sector: currentPitch.sector, equity: currentPitch.equity, costPaid: liveVal
+        });
+    }
+
+    function passStartup() { roomRef.child(`players/${playerId}`).update({ action: "Passed" }); }
+
+    function openSellModal(startupName) {
+        assetToSell = roomState.players[playerId].investments[startupName];
+        document.getElementById("sell-asset-name").innerText = `${assetToSell.name} (${assetToSell.equity}% Equity)`;
+        document.getElementById("sell-modal").classList.add("active");
+    }
+
+    function closeSellModal() {
+        document.getElementById("sell-modal").classList.remove("active");
+        document.getElementById("sell-price-input").value = ""; assetToSell = null;
+    }
+
+    function confirmSell() {
+        let price = parseInt(document.getElementById("sell-price-input").value);
+        if(!price || price <= 0) return showGameAlert("Invalid", "Please enter a valid amount.");
+        roomRef.update({ tradeOffer: { sellerId: playerId, sellerName: roomState.players[playerId].name, startup: assetToSell.name, equity: assetToSell.equity, price: price, costPaid: assetToSell.costPaid }});
+        closeSellModal(); showGameAlert("Offer Broadcasted", "Your offer is live on the trading floor.");
+    }
+
+    function acceptTrade() {
+        let offer = roomState.tradeOffer; if (!offer) return;
+        let myData = roomState.players[playerId];
+        if (myData.cash < offer.price) return showGameAlert("Declined", "You do not have enough liquid cash to buy this.");
+
+        let newMyCash = myData.cash - offer.price; let sellerCash = roomState.players[offer.sellerId].cash + offer.price;
+        let updates = {};
+        updates[`players/${playerId}/cash`] = newMyCash; updates[`players/${offer.sellerId}/cash`] = sellerCash;
+        updates[`players/${playerId}/investments/${offer.startup}`] = { name: offer.startup, sector: "Acquired", equity: offer.equity, costPaid: offer.costPaid };
+        updates[`players/${offer.sellerId}/investments/${offer.startup}`] = null;
+        updates[`tradeOffer`] = null;
+
+        roomRef.update(updates).then(() => { showGameAlert("Trade Successful", `You successfully acquired ${offer.startup}!`); });
+    }
+</script>
+</body>
+</html>

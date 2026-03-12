@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rise to the 1% - Investment Strategy Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --primary-red: #ff3e3e;
+            --dark-red: #8b0000;
+            --black: #050505;
+            --dark-gray: rgba(20, 20, 20, 0.7);
+            --text-white: #f0f0f0;
+            --accent-gold: #ffd700;
+            --glass: rgba(20, 20, 20, 0.6);
+            --border: rgba(255, 62, 62, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+
+        body {
+            background-color: var(--black);
+            color: var(--text-white);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: radial-gradient(circle at 50% 50%, #1a0505 0%, #000000 100%);
+            perspective: 1000px;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,0,0,0.05) 0%, transparent 20%),
+                        radial-gradient(circle, rgba(255,215,0,0.03) 0%, transparent 20%);
+            background-position: 0 0, 50px 50px;
+            animation: bgShift 20s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes bgShift {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .logo-bar { width: 100%; display: flex; justify-content: center; padding: 20px; z-index: 10; }
+        .logo-bar img { max-width: 380px; width: 95%; filter: drop-shadow(0 0 10px rgba(255,0,0,0.3)); }
+
+        .container { width: 100%; max-width: 650px; padding: 20px; z-index: 10; }
+
+        .card {
+            background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 20px; padding: 35px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+            text-align: center; margin-bottom: 20px; transform-style: preserve-3d;
+            transition: transform 0.1s ease-out, opacity 0.4s ease, border-color 0.3s ease;
+        }
+
+        .card:hover { border-color: rgba(255, 62, 62, 0.6); }
+
+        h1 {
+            color: var(--primary-red); font-size: 2.3rem; margin-bottom: 10px;
+            text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 20px rgba(255,0,0,0.4);
+            transform: translateZ(30px);
+        }
+
+        h2 { color: var(--accent-gold); margin-bottom: 15px; transform: translateZ(20px); }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary-red), var(--dark-red));
+            color: white; border: none; padding: 15px; font-size: 1rem; border-radius: 12px;
+            cursor: pointer; width: 100%; margin: 10px 0; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255,0,0,0.2); transform: translateZ(10px);
+        }
+
+        .btn:hover { transform: translateY(-2px) translateZ(15px); box-shadow: 0 8px 25px rgba(255,0,0,0.5); }
+        .btn-secondary { background: rgba(0,0,0,0.5); border: 1px solid var(--primary-red); box-shadow: none; }
+
+        .mode-select { display: flex; gap: 10px; margin-bottom: 20px; transform: translateZ(15px); }
+        .mode-btn {
+            flex: 1; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid #333;
+            color: #888; cursor: pointer; border-radius: 10px; transition: all 0.3s;
+        }
+        .mode-btn.active { background: var(--primary-red); color: white; border-color: var(--primary-red); }
+
+        .timer-bar {
+            width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+            border-radius: 10px; margin: 15px 0; overflow: hidden;
+        }
+        .timer-fill {
+            height: 100%; background: linear-gradient(90deg, var(--primary-red), var(--accent-gold));
+            width: 100%; transition: width 1s linear;
+        }
+
+        .question-text { font-size: 1.2rem; margin-bottom: 20px; line-height: 1.5; transform: translateZ(20px); }
+        .options-grid { display: grid; gap: 10px; transform: translateZ(15px); }
+        
+        .option-btn {
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 15px; text-align: left; border-radius: 12px;
+            cursor: pointer; transition: all 0.2s ease; position: relative; overflow: hidden;
+        }
+
+        .option-btn:hover:not(.disabled-btn) { background: rgba(255, 62, 62, 0.1); border-color: var(--primary-red); transform: translateX(5px); }
+        .option-btn.correct { background: #27ae60 !important; border-color: #2ecc71; animation: pulse 0.5s; }
+        .option-btn.wrong { background: #c0392b !important; border-color: #e74c3c; animation: shake 0.4s; }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); box-shadow: 0 0 15px #2ecc71; } 100% { transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+        .disabled-btn { pointer-events: none; opacity: 0.9; }
+        .hidden { display: none !important; }
+
+        .score-display { font-size: 3.5rem; color: var(--accent-gold); font-weight: bold; text-shadow: 0 0 20px rgba(255, 215, 0, 0.3); transform: translateZ(30px); }
+        .career-wealth { font-size: 1.5rem; color: #2ecc71; font-weight: 600; margin-top: 10px; margin-bottom: 20px; }
+        .rank-display { font-size: 1.2rem; color: #aaa; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+
+        .leaderboard-entry {
+            display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.02); margin-bottom: 5px; border-radius: 8px; font-size: 1.1rem;
+        }
+
+        .input-field {
+            width: 100%; padding: 14px; margin: 12px 0; background: rgba(0,0,0,0.4);
+            border: 1px solid var(--primary-red); color: white; border-radius: 12px; font-size: 16px; transition: box-shadow 0.3s; transform: translateZ(15px);
+        }
+        .input-field:focus { outline: none; box-shadow: 0 0 15px rgba(255,0,0,0.3); }
+
+        /* The Money Box Styling */
+        .money-box {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(0, 0, 0, 0.6)); border: 1px solid rgba(255, 215, 0, 0.4);
+            border-radius: 15px; padding: 20px; margin-bottom: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transform: translateZ(20px); box-shadow: 0 10px 30px rgba(255, 215, 0, 0.1), inset 0 0 20px rgba(255, 215, 0, 0.05); transition: all 0.3s ease;
+        }
+        .money-box:hover { box-shadow: 0 15px 40px rgba(255, 215, 0, 0.2), inset 0 0 20px rgba(255, 215, 0, 0.1); border-color: var(--accent-gold); }
+        .money-box-title { color: #aaa; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+        .money-box-value { font-size: 2.8rem; color: var(--accent-gold); font-weight: 700; text-shadow: 0 0 15px rgba(255, 215, 0, 0.3); letter-spacing: 1px; }
+        .money-box-user { font-size: 1.1rem; color: #fff; margin-bottom: 10px; font-weight: 500; }
+
+        .hint-container { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+        #hint-btn {
+            background: rgba(255, 215, 0, 0.1); border: 1px solid var(--accent-gold); border-radius: 50%; width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s;
+        }
+        #hint-btn:hover:not(:disabled) { background: var(--accent-gold); transform: rotate(15deg) scale(1.1); }
+        #hint-btn:hover:not(:disabled) svg { fill: #000; }
+        #hint-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #555; }
+
+        footer { text-align: center; margin-top: auto; font-size: 13px; color: #aaa; padding: 20px; line-height: 1.5; }
+
+        /* Custom Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-box {
+            transform: scale(0.8) translateZ(30px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 90%; max-width: 400px;
+            border-color: var(--primary-red); box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(255,0,0,0.3); background: var(--glass);
+        }
+        .modal-overlay.active .modal-box { transform: scale(1) translateZ(30px); }
+    </style>
+</head>
+<body>
+
+<div class="logo-bar">
+    <a href="https://nuv.ac.in/" target="_blank" style="display: inline-block;">
+        <img src="https://i.ibb.co/Q3rhKKzp/IMG-20260311-161054.png" alt="Navrachana University">
+    </a>
+</div>
+
+<div class="container">
+    <div id="start-screen" class="card">
+        <h1>Rise to the 1%</h1>
+        <p style="color: #aaa; margin-bottom: 20px;">Master Investment & Business Strategy</p>
+        
+        <div id="money-box-container" class="money-box hidden">
+            <div class="money-box-user" id="welcome-text">Trader: Unknown</div>
+            <div class="money-box-title">Total Career Net Worth</div>
+            <div class="money-box-value" id="career-wealth-text">$0</div>
+        </div>
+        
+        <div id="name-input-container">
+            <input type="text" id="username" class="input-field" placeholder="Enter Your Name">
+        </div>
+
+        <div class="mode-select">
+            <button class="mode-btn active" onclick="setMode('quiz', this)">Knowledge Quiz</button>
+            <button class="mode-btn" onclick="setMode('real', this)">Real Life Strategy</button>
+        </div>
+        <button class="btn" onclick="startGame()">Commence Trading</button>
+        <button class="btn btn-secondary" onclick="showLeaderboard()">Global Leaderboard</button>
+   <button class="btn" onclick="window.location.href='sharktank.html'" style="margin-top: 15px; background: linear-gradient(135deg, #8e44ad, #9b59b6); box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);">
+            Enter Student Shark Tank (Multiplayer)
+        </button>
+    </div>
+
+    <div id="game-screen" class="card hidden">
+        <div style="display:flex; justify-content:space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 10px;">
+            <span id="player-display" style="font-weight: 600; color: #aaa;"></span>
+            <span id="score-display" style="color: var(--accent-gold); font-size: 1.2rem; font-weight: bold;">Session Profit: $0</span>
+        </div>
+        
+        <div class="hint-container">
+            <button id="hint-btn" onclick="useHint()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffd700" style="transition: fill 0.3s;"><path d="M12 2a7 7 0 0 0-4 12.9V18a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-3.1A7 7 0 0 0 12 2z"/></svg>
+            </button>
+            <span style="font-size: 0.9rem; color: #888;">Hint (-30)</span>
+        </div>
+        
+        <div class="timer-bar"><div id="timer-fill" class="timer-fill"></div></div>
+        <div style="text-align:right; font-size:0.9rem; color: #888; margin-bottom: 15px;">
+            Time: <span id="time-left" style="color: white; font-weight: bold;">30</span>s
+        </div>
+        
+        <h2 id="question-number">Question</h2>
+        <p id="question-text" class="question-text"></p>
+        <div id="options-container" class="options-grid"></div>
+        <div id="options-container" class="options-grid"></div>
+        
+        <button class="btn btn-secondary" onclick="quitGame()" style="margin-top: 25px; border-color: var(--primary-red); color: var(--primary-red);">
+            Abort Session (Exit)
+        </button>
+    </div>
+
+    <div id="result-screen" class="card hidden">
+        <h1 id="end-title">Challenge Complete</h1>
+        <p>Session Profit</p>
+        <div id="final-score" class="score-display">0</div>
+        <p style="margin-top: 15px; color: #aaa;">Total Career Net Worth</p>
+        <div id="final-career-wealth" class="career-wealth">$0</div>
+        <div id="final-rank" class="rank-display">Retail Trader</div>
+        <button class="btn" onclick="restartGame()">Return to Dashboard</button>
+        <button class="btn btn-secondary" onclick="showLeaderboard()">Global Leaderboard</button>
+    </div>
+
+    <div id="leaderboard-screen" class="card hidden">
+        <h1>Global 1% Club</h1>
+        <p style="color: #aaa; margin-bottom: 20px;">Top Institutional Investors</p>
+        <div id="leaderboard-list" style="margin-bottom: 25px;"></div>
+        <button class="btn btn-secondary" onclick="goHome()">Back to Dashboard</button>
+    </div>
+
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-box card">
+            <h2 id="modal-title" style="color: var(--primary-red); margin-bottom: 10px;">Notice</h2>
+            <p id="modal-message" style="margin-bottom: 25px; color: #ccc; font-size: 1.1rem;"></p>
+            <button id="modal-btn" class="btn">Acknowledge</button>
+        </div>
+    </div>
+</div>
+
+<footer>
+    © 2026 Rise to the 1% — All Rights Reserved.<br>
+    All copyrights are held by <strong>Booboo</strong>.
+</footer>
+
+<script>
+    // ==========================================
+    // 🌐 FIREBASE CONFIGURATION
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjvjdjzOazn3NMhFGl3kF8IkcUpgBuFl0",
+      authDomain: "rise-to-the-1-percent.firebaseapp.com",
+      projectId: "rise-to-the-1-percent",
+      storageBucket: "rise-to-the-1-percent.firebasestorage.app",
+      messagingSenderId: "250810896412",
+      appId: "1:250810896412:web:8179fafb6fa0598f0ecfd9",
+      measurementId: "G-JZ0C7HDB81"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    // ==========================================
+
+    let userProfile = { name: "", totalWealth: 0 };
+
+    window.onload = () => {
+        let savedData = localStorage.getItem("1percentProfile");
+        if (savedData) {
+            userProfile = JSON.parse(savedData);
+            document.getElementById("name-input-container").classList.add("hidden");
+            document.getElementById("money-box-container").classList.remove("hidden");
+            document.getElementById("welcome-text").innerText = `Trader: ${userProfile.name}`;
+            document.getElementById("career-wealth-text").innerText = `$${userProfile.totalWealth.toLocaleString()}`;
+            
+            // Sync local save with cloud on load
+            syncToCloud();
+        }
+    };
+    function saveProfile() {
+        localStorage.setItem("1percentProfile", JSON.stringify(userProfile));
+        syncToCloud();
+    }
+
+    // New Cloud Sync Function
+    function syncToCloud() {
+        if (!userProfile.name) return;
+        
+        // Save to Firebase under the 'users' node
+        database.ref('users/' + userProfile.name).set({
+            name: userProfile.name,
+            score: userProfile.totalWealth
+        }).catch((error) => {
+            console.error("Cloud sync failed. Did you update your Firebase Database Rules to true?", error);
+        });
+    }
+
+    // New Cloud Leaderboard Fetcher
+    function showLeaderboard() {
+        document.getElementById("start-screen").classList.add("hidden");
+        document.getElementById("result-screen").classList.add("hidden");
+        document.getElementById("leaderboard-screen").classList.remove("hidden");
+
+        let list = document.getElementById("leaderboard-list");    
+        list.innerHTML = "<span style='color: #aaa;'>📡 Uplinking to Global Market Server...</span>";    
+
+        // Pull top 15 users from Firebase
+        database.ref('users').orderByChild('score').limitToLast(15).once('value', (snapshot) => {
+            let globalPlayers = [];
+            snapshot.forEach((childSnapshot) => {
+                globalPlayers.push(childSnapshot.val());
+            });
+
+            // Firebase sorts lowest to highest, so we reverse the array to put #1 at the top
+            globalPlayers.reverse(); 
+
+            list.innerHTML = "";
+            if (globalPlayers.length === 0) {
+                list.innerHTML = "<span style='color:#aaa'>Market empty. Be the first!</span>";
+                return;
+            }
+
+            globalPlayers.forEach((p, i) => {    
+                let div = document.createElement("div");    
+                div.className = "leaderboard-entry"; 
+                div.innerHTML = `<span><strong style='color: #fff;'>${i + 1}.</strong> ${p.name}</span><span style='color:var(--accent-gold); font-weight:bold;'>$${p.score.toLocaleString()}</span>`;    
+                list.appendChild(div);    
+            });
+        }).catch((error) => {
+            list.innerHTML = "<span style='color:#ff3e3e'>Server Offline. Check connection or Database Rules.</span>";
+            console.error(error);
+        });
+    }
+
+    function goHome() {
+        document.getElementById("leaderboard-screen").classList.add("hidden");
+        document.getElementById("start-screen").classList.remove("hidden");
+    }
+
+    // --- 3D Card Tilt Effect ---
+    document.addEventListener('mousemove', (e) => {
+        const cards = document.querySelectorAll('.card:not(.hidden)');
+        cards.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateX = ((y - centerY) / centerY) * -5; 
+            const rotateY = ((x - centerX) / centerX) * 5;
+            card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        });
+    });
+
+    document.addEventListener('mouseleave', () => {
+        document.querySelectorAll('.card').forEach(card => {
+            card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`;
+        });
+    });
+
+    // Custom Alert Function
+    function showGameAlert(title, message, callback = null) {
+        const modal = document.getElementById('custom-modal');
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-message').innerText = message;
+        modal.classList.add('active');
+        
+        const btn = document.getElementById('modal-btn');
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.onclick = () => {
+            modal.classList.remove('active');
+            if(callback) callback();
+        };
+    }
+
+    // --- Game Logic ---
+    const TIME_LIMIT = 30;
+    let currentMode = "quiz";
+    let score = 0;
+    let currentQuestionIndex = 0;
+    let timer;
+    let timeLeft = TIME_LIMIT;
+    let gameQuestions = [];
+    let hintUsed = false;
+
+    // Full 100 Questions Array
+    const baseQuestions = [
+        // --- QUIZ: Personal Finance & Investing (1-20) ---
+        { type: "quiz", question: "What does FIRE stand for?", options: ["Financial Independence Retire Early", "Fast Income Real Estate", "Future Investment Risk Equity", "Fund Income Real Estate"], answer: 0 },
+        { type: "quiz", question: "What is ROI?", options: ["Return on Investment", "Rate of Income", "Risk of Investment", "Return on Interest"], answer: 0 },
+        { type: "quiz", question: "What is diversification?", options: ["Spreading investments", "One stock only", "Avoid investing", "Crypto only"], answer: 0 },
+        { type: "quiz", question: "What is compound interest?", options: ["Interest on principal only", "Interest on principal + interest", "Loan interest", "Tax interest"], answer: 1 },
+        { type: "quiz", question: "What is passive income?", options: ["Investment income", "Salary", "Borrowed money", "Loan"], answer: 0 },
+        { type: "quiz", question: "What does an 'Emergency Fund' typically cover?", options: ["Vacations", "3-6 months of expenses", "A new car", "Stock market bets"], answer: 1 },
+        { type: "quiz", question: "What is an Index Fund?", options: ["A single tech stock", "A mutual fund tracking a market index", "A real estate trust", "A high-interest bank account"], answer: 1 },
+        { type: "quiz", question: "What is inflation?", options: ["Increase in purchasing power", "Decrease in prices", "General increase in prices over time", "A type of tax"], answer: 2 },
+        { type: "quiz", question: "What is a liability?", options: ["Something you own", "Something you owe", "Your salary", "Your investments"], answer: 1 },
+        { type: "quiz", question: "What is an asset?", options: ["Credit card debt", "A car loan", "Something that puts money in your pocket", "Monthly rent"], answer: 2 },
+        { type: "quiz", question: "What is liquidity?", options: ["Water utilities", "How easily an asset can be converted to cash", "A market crash", "Long-term debt"], answer: 1 },
+        { type: "quiz", question: "What is a Bear Market?", options: ["Market trending up", "Market trending down", "Market staying flat", "Market closing early"], answer: 1 },
+        { type: "quiz", question: "What is a Bull Market?", options: ["Market trending down", "Market trending up", "Market with no volume", "Market in a recession"], answer: 1 },
+        { type: "quiz", question: "What are dividends?", options: ["Taxes paid to the government", "Company profits paid out to shareholders", "Employee bonuses", "Interest on a bank loan"], answer: 1 },
+        { type: "quiz", question: "What does 'Net Worth' mean?", options: ["Total salary", "Assets minus liabilities", "Total investments", "Credit score"], answer: 1 },
+        { type: "quiz", question: "What is a capital gain?", options: ["Profit from selling an asset", "Monthly salary", "Bank interest", "A type of loan"], answer: 0 },
+        { type: "quiz", question: "What is a credit score?", options: ["Your bank balance", "A numerical rating of your creditworthiness", "Your total debt", "Your stock portfolio value"], answer: 1 },
+        { type: "quiz", question: "What is an IPO?", options: ["Initial Public Offering", "Internal Profit Objective", "Internet Protocol Operation", "Investment Portfolio Output"], answer: 0 },
+        { type: "quiz", question: "What is a mutual fund?", options: ["A personal savings account", "Pool of money from investors used to buy securities", "A government bond", "A single company stock"], answer: 1 },
+        { type: "quiz", question: "What does 'amortization' refer to?", options: ["Paying off a loan over time with regular payments", "Buying stocks", "Selling real estate", "Calculating taxes"], answer: 0 },
+
+        // --- QUIZ: Business Strategy & Economics (21-40) ---
+        { type: "quiz", question: "What is an 'Economic Moat'?", options: ["A physical barrier", "A competitive advantage protecting long-term profits", "A high tax bracket", "A failed business model"], answer: 1 },
+        { type: "quiz", question: "In Porter's Five Forces, what reduces industry profitability?", options: ["High barriers to entry", "Low bargaining power of buyers", "High threat of substitutes", "Weak competitors"], answer: 2 },
+        { type: "quiz", question: "What is a Blue Ocean Strategy?", options: ["Fighting in a crowded market", "Creating an uncontested new market space", "Focusing only on shipping", "Lowering prices to zero"], answer: 1 },
+        { type: "quiz", question: "What are 'switching costs'?", options: ["The cost to change suppliers or software vendors", "The price of a light switch", "Shipping fees", "Employee turnover costs"], answer: 0 },
+        { type: "quiz", question: "What is a 'Network Effect'?", options: ["A computer virus", "A product gaining value as more people use it", "Networking at events", "Cable television advertising"], answer: 1 },
+        { type: "quiz", question: "What does B2B stand for?", options: ["Business to Bank", "Business to Business", "Back to Business", "Buyer to Buyer"], answer: 1 },
+        { type: "quiz", question: "What does B2C stand for?", options: ["Business to Consumer", "Business to Corporation", "Buyer to Customer", "Bank to Consumer"], answer: 0 },
+        { type: "quiz", question: "What is 'Capital Allocation'?", options: ["Hiring employees", "How a CEO decides to invest company cash", "Marketing design", "Customer support"], answer: 1 },
+        { type: "quiz", question: "What does ROI measure in business?", options: ["Employee happiness", "Efficiency of an investment", "Website traffic", "Brand awareness"], answer: 1 },
+        { type: "quiz", question: "What is a 'Value Proposition'?", options: ["The total cost of a product", "The unique benefit a company offers customers", "A business loan request", "The company logo"], answer: 1 },
+        { type: "quiz", question: "What is 'churn rate'?", options: ["How fast you make butter", "The percentage of customers who stop using your service", "Employee hiring speed", "Profit margins"], answer: 1 },
+        { type: "quiz", question: "What is an economy of scale?", options: ["Weighing products", "Cost advantages gained by a higher level of production", "A small local market", "High inflation"], answer: 1 },
+        { type: "quiz", question: "What is a target market?", options: ["A physical store", "The specific group of consumers a product is aimed at", "The stock exchange", "Competitors"], answer: 1 },
+        { type: "quiz", question: "What is gross profit?", options: ["Revenue minus cost of goods sold", "Total revenue", "Revenue minus all expenses and taxes", "Total debt"], answer: 0 },
+        { type: "quiz", question: "What is net profit?", options: ["Total sales", "Revenue minus cost of goods sold", "Total revenue minus all expenses", "Investment capital"], answer: 2 },
+        { type: "quiz", question: "What is a 'Loss Leader'?", options: ["A bad manager", "A product sold at a loss to attract customers", "A bankrupt company", "A poor investment"], answer: 1 },
+        { type: "quiz", question: "What is bootstrapping?", options: ["Buying shoes", "Funding a business from personal finances and operating revenue", "Taking a bank loan", "Getting VC funding"], answer: 1 },
+        { type: "quiz", question: "What is a franchise?", options: ["A unique startup", "A business model where you buy the rights to open an established brand", "A government grant", "A corporate buyout"], answer: 1 },
+        { type: "quiz", question: "What is 'Market Share'?", options: ["A stock dividend", "The portion of a market controlled by a particular company", "A public trading floor", "A shared office space"], answer: 1 },
+        { type: "quiz", question: "What does 'LTV' stand for in business metrics?", options: ["Long-Term Value", "Lifetime Value of a customer", "Loan To Value", "Limited Time Venture"], answer: 1 },
+
+        // --- QUIZ: Tech, Software & Systems as a Business (41-60) ---
+        { type: "quiz", question: "What is SaaS?", options: ["System as a Service", "Software as a Service", "Sales as a System", "Security as a Standard"], answer: 1 },
+        { type: "quiz", question: "In a software business, what does 'Tech Debt' refer to?", options: ["Bank loans for computers", "The implied cost of future rework caused by choosing an easy solution now", "Unpaid software subscriptions", "Credit card debt for AWS"], answer: 1 },
+        { type: "quiz", question: "Why is an optimized DBMS crucial for a software business?", options: ["It looks pretty", "It ensures fast data retrieval and lowers server costs", "It writes code automatically", "It manages HR"], answer: 1 },
+        { type: "quiz", question: "Which language is typically favored for high-performance, low-latency trading systems?", options: ["HTML", "CSS", "C++", "JavaScript"], answer: 2 },
+        { type: "quiz", question: "What is 'Scalability' in a tech startup?", options: ["Weighing servers", "The ability of a system to handle a growing amount of work seamlessly", "Hiring more managers", "Increasing prices"], answer: 1 },
+        { type: "quiz", question: "What is an API?", options: ["Application Programming Interface", "Automated Profit Index", "Advanced Payment Integration", "Application Protocol Internet"], answer: 0 },
+        { type: "quiz", question: "In database design, what is 'Normalization'?", options: ["Making data look normal", "Organizing data to reduce redundancy and improve integrity", "Deleting old data", "Backing up the database"], answer: 1 },
+        { type: "quiz", question: "What is a 'Primary Key' in a database?", options: ["The main password", "A unique identifier for a record in a table", "The encryption key", "The first column"], answer: 1 },
+        { type: "quiz", question: "Why do enterprise systems use Java?", options: ["It's the newest language", "Platform independence (Write Once, Run Anywhere) and robust security", "It doesn't use a compiler", "It's only for mobile apps"], answer: 1 },
+        { type: "quiz", question: "What is the primary benefit of Cloud Computing for a startup?", options: ["No internet needed", "Replacing upfront infrastructure costs with variable costs", "Free advertising", "Guaranteed security"], answer: 1 },
+        { type: "quiz", question: "What is UI/UX?", options: ["User Integration/User X-ray", "User Interface/User Experience", "Unified Index/Unified Execution", "Unit Input/Unit X"], answer: 1 },
+        { type: "quiz", question: "What does 'Open Source' mean?", options: ["A store that is always open", "Software with source code that anyone can inspect, modify, and enhance", "A free computer", "Unsecured data"], answer: 1 },
+        { type: "quiz", question: "What is a 'Freemium' business model?", options: ["Everything is free", "Basic services are free, advanced features are paid", "Paying for freedom", "A premium subscription only"], answer: 1 },
+        { type: "quiz", question: "What is 'Agile' methodology?", options: ["Running fast", "An iterative approach to software development and project management", "A rigid, step-by-step plan", "A type of database"], answer: 1 },
+        { type: "quiz", question: "What does 'MVP' stand for in startups?", options: ["Most Valuable Player", "Minimum Viable Product", "Maximum Value Proposition", "Minimum Variable Price"], answer: 1 },
+        { type: "quiz", question: "What is a foreign key in a DBMS?", options: ["A key made overseas", "A field linking two tables together", "An unused index", "A hacked password"], answer: 1 },
+        { type: "quiz", question: "Why is recurring revenue valuable?", options: ["It's harder to track", "It provides predictable cash flow", "It's a one-time payment", "It avoids taxes"], answer: 1 },
+        { type: "quiz", question: "What is 'Vendor Lock-in'?", options: ["Locking the office door", "When a customer is dependent on a vendor and cannot easily switch", "A secure server", "A contract dispute"], answer: 1 },
+        { type: "quiz", question: "What is a 'Serverless' architecture?", options: ["No computers are used", "The cloud provider dynamically manages the allocation of machine resources", "A broken network", "Using only local hard drives"], answer: 1 },
+        { type: "quiz", question: "In software, what is a 'Deployment'?", options: ["Firing an employee", "Pushing new code to a live environment", "Writing a business plan", "Buying a domain name"], answer: 1 },
+
+        // --- REAL: Personal Finance & Investing Scenarios (61-80) ---
+        { type: "real", question: "You receive a ₹1,00,000 bonus. Best move?", options: ["Buy the newest phone", "Invest the majority in index funds", "Spend it all on a trip", "Leave it in a zero-interest account"], answer: 1 },
+        { type: "real", question: "A friend promises a guaranteed 50% return in a month.", options: ["Invest all your savings", "Invest a little bit", "Avoid it, it's likely a scam", "Take a loan to invest"], answer: 2 },
+        { type: "real", question: "You want to start investing but have ₹50,000 in high-interest credit card debt. What first?", options: ["Buy crypto", "Pay off the credit card debt", "Buy individual stocks", "Put it in a savings account"], answer: 1 },
+        { type: "real", question: "You get a 10% raise at work. To avoid lifestyle creep, you should:", options: ["Upgrade your car", "Increase your investment rate by 10%", "Start eating out every day", "Buy designer clothes"], answer: 1 },
+        { type: "real", question: "The stock market crashes by 20%. Your portfolio is down. What do you do?", options: ["Panic sell everything", "Stop looking at it and stay the course", "Take out a loan to buy more", "Switch to gold only"], answer: 1 },
+        { type: "real", question: "You want to buy a house in 2 years. Where should you put the down payment money?", options: ["High-risk tech stocks", "A high-yield savings account or fixed deposit", "Cryptocurrency", "Under your mattress"], answer: 1 },
+        { type: "real", question: "You are 20 years old. Should your retirement portfolio be mostly:", options: ["Cash", "Bonds", "Equities/Stocks", "Gold"], answer: 2 },
+        { type: "real", question: "You want to diversify. You currently own 10 tech stocks. You should buy:", options: ["Another tech stock", "An index fund covering multiple sectors", "A new laptop", "Tech company bonds"], answer: 1 },
+        { type: "real", question: "An influencer is hyping up a penny stock. What is the risk?", options: ["Zero risk", "It's likely a pump-and-dump scheme", "Guaranteed 10x returns", "It's too expensive"], answer: 1 },
+        { type: "real", question: "You have ₹10,000 left over every month. Best strategy?", options: ["Automate a monthly transfer to an investment account", "Keep it in checking until you remember to invest", "Spend it", "Buy lottery tickets"], answer: 0 },
+        { type: "real", question: "A company's stock price drops 50% because its core business model is obsolete. Do you buy the dip?", options: ["Yes, it's cheap!", "No, a falling stock can keep falling if the business is broken", "Yes, it has to go back up", "Buy on margin"], answer: 1 },
+        { type: "real", question: "You are evaluating two index funds. Fund A has an expense ratio of 0.05%. Fund B is 1.5%. Which is better?", options: ["Fund A, lower fees mean more compound interest for you", "Fund B, higher fees mean better management", "They are exactly the same", "Neither"], answer: 0 },
+        { type: "real", question: "You are evaluating two index funds. Fund A has an expense ratio of 0.05%. Fund B is 1.5%. Which is better?", options: ["Fund A, lower fees mean more compound interest for you", "Fund B, higher fees mean better management", "They are exactly the same", "Neither"], answer: 0 },
+        { type: "real", question: "You want to quit your job. What should you have first?", options: ["A new car", "A 6-month emergency fund", "A credit card", "A detailed vacation plan"], answer: 1 },
+        { type: "real", question: "You inherited ₹5,00,000 but have no investing experience. First step?", options: ["Day trade options", "Educate yourself and consider broad index funds", "Buy a friend's startup", "Leave it as cash forever"], answer: 1 },
+        { type: "real", question: "Your investment portfolio is highly volatile and keeps you awake at night. You should:", options: ["Check it every hour", "Reassess your risk tolerance and perhaps add bonds/stable assets", "Sell everything", "Double down"], answer: 1 },
+        { type: "real", question: "You want to buy a rental property. The rent won't cover the mortgage. Good idea?", options: ["Yes, property always goes up", "No, it generates negative cash flow", "Yes, for the tax write-offs only", "Maybe, if you raise rent immediately"], answer: 1 },
+        { type: "real", question: "You get an email from the IRS/Tax authority asking for payment via gift cards.", options: ["Buy the gift cards immediately", "Ignore and report it as a phishing scam", "Reply with your bank details", "Forward to a friend"], answer: 1 },
+        { type: "real", question: "You are choosing between paying off a 3% student loan or investing in the market averaging 8%.", options: ["Pay off the loan immediately", "Make minimum payments on the loan and invest the rest", "Ignore the loan", "Default on the loan"], answer: 1 },
+        { type: "real", question: "You want to start building wealth. What is the fundamental formula?", options: ["Spend > Earn", "Earn > Spend and invest the difference", "Borrow > Spend", "Earn = Spend"], answer: 1 },
+        { type: "real", question: "You read a book on personal finance. Best next step?", options: ["Put it on the shelf", "Actually implement one habit from the table of contents today", "Buy 10 more books", "Tell everyone you are rich"], answer: 1 },
+
+        // --- REAL: Tech Business & Strategy Scenarios (81-100) ---
+        { type: "real", question: "Before starting a new software business?", options: ["Quit your job immediately", "Validate the idea with real potential customers", "Hire a full staff", "Take a massive bank loan"], answer: 1 },
+        { type: "real", question: "You are building a Restaurant Management System. To create an 'Economic Moat', you should:", options: ["Make it slightly cheaper than competitors", "Deeply integrate it with the restaurant's inventory and accounting to create high switching costs", "Use a better logo", "Run Facebook ads"], answer: 1 },
+        { type: "real", question: "Your SaaS product has a high churn rate. First step?", options: ["Lower the price", "Talk to churning users to find the core issue", "Run more ads to get new users", "Rewrite the codebase in C++"], answer: 1 },
+        { type: "real", question: "Your app's database queries are slow, causing users to leave. What's the fix?", options: ["Change the UI colors", "Normalize the DBMS and add proper indexing", "Hire a new marketing team", "Switch hosting providers"], answer: 1 },
+        { type: "real", question: "You have an idea for a jewelry advertisement AI tool. How do you test it?", options: ["Spend a year building the perfect engine", "Build a quick MVP generating a few reels to see if jewelers will pay for it", "Take out a billboard", "Hire 10 developers"], answer: 1 },
+        { type: "real", question: "A competitor copies your app's features exactly. How do you win?", options: ["Sue them immediately", "Focus on superior customer service and a stronger brand community", "Copy their website", "Give up"], answer: 1 },
+        { type: "real", question: "You are pricing your new B2B software. You should:", options: ["Make it as cheap as possible", "Price based on the value and ROI it generates for the business client", "Copy your cheapest competitor", "Make it free forever"], answer: 1 },
+        { type: "real", question: "Your tech startup just received 126 new enterprise leads. How do you handle them?", options: ["Spam them all", "Qualify them and focus on the ones with the highest likelihood to close", "Ignore them", "Sell the list"], answer: 1 },
+        { type: "real", question: "You need to build a prototype quickly. Do you use:", options: ["Complex C++ architecture", "The tools you know best (like Java) or rapid web frameworks", "Assembly language", "Punch cards"], answer: 1 },
+        { type: "real", question: "Your software company is profitable. You want to allocate capital to grow. Best use?", options: ["Buy expensive office furniture", "Reinvest in R&D to build requested features that reduce churn", "Buy a company yacht", "Pay it all out as a bonus"], answer: 1 },
+        { type: "real", question: "A restaurant client asks for a custom feature only they will use. Do you build it?", options: ["Yes, immediately", "No, or charge a high custom development fee, focusing the core product on features many clients need", "Yes, for free", "Ignore them"], answer: 1 },
+        { type: "real", question: "You are pitching your software to an investor. What metric do they care about most?", options: ["Lines of code written", "Customer Acquisition Cost (CAC) vs Lifetime Value (LTV)", "The framework used", "Office location"], answer: 1 },
+        { type: "real", question: "Your website traffic is high, but no one is signing up. What's the problem?", options: ["Server is too slow", "Your Value Proposition on the landing page is unclear", "Need more traffic", "Wrong programming language"], answer: 1 },
+        { type: "real", question: "You want to create a 'Blue Ocean' in the hospitality software space. You should:", options: ["Make another standard POS system", "Combine POS, AI inventory prediction, and automated marketing into one new category", "Lower your POS price by 5%", "Offer a free tablet"], answer: 1 },
+        { type: "real", question: "Your lead developer quits, and no one else understands the codebase. This is a failure of:", options: ["Marketing", "Documentation and knowledge sharing", "Sales", "Venture capital"], answer: 1 },
+        { type: "real", question: "You are designing the backend of a scalable app. Which database concept is vital?", options: ["Using only text files", "Ensuring ACID properties for reliable transactions", "Avoiding primary keys", "Storing everything in local memory"], answer: 1 },
+        { type: "real", question: "You want to market your tech product for free. Best method?", options: ["Super Bowl ad", "Content marketing and SEO demonstrating your expertise", "Direct mail", "Cold calling yellow pages"], answer: 1 },
+        { type: "real", question: "A client refuses to pay for the final milestone of your software project. How to prevent this next time?", options: ["Never do milestones", "Have a clear contract and withhold final code delivery until payment clears", "Only work for free", "Sue immediately"], answer: 1 },
+        { type: "real", question: "You find a bug in production that is losing the company money. First step?", options: ["Blame a coworker", "Revert to the last stable deployment immediately", "Write a post-mortem document", "Go to lunch"], answer: 1 },
+        { type: "real", question: "Your tech startup finally hits positive cash flow. What is your priority?", options: ["Relax", "Analyze what worked and systematically scale that growth channel", "Sell the company instantly", "Pivot to a new industry"], answer: 1 }
+    ];
+
+    function setMode(mode, btn) {
+        currentMode = mode;
+        document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+    }
+
+    function startGame() {
+        if (!userProfile.name) {
+            let inputName = document.getElementById("username").value.trim();
+            if (!inputName) { 
+                showGameAlert("Identity Required", "Enter your name to access the market."); 
+                return; 
+            }
+            userProfile.name = inputName;
+            
+            document.getElementById("name-input-container").classList.add("hidden");
+            document.getElementById("money-box-container").classList.remove("hidden");
+            document.getElementById("welcome-text").innerText = `Trader: ${userProfile.name}`;
+            document.getElementById("career-wealth-text").innerText = `$${userProfile.totalWealth.toLocaleString()}`;
+            
+            saveProfile();
+        }
+
+        score = 0;
+        currentQuestionIndex = 0;
+        gameQuestions = baseQuestions.filter(q => q.type === currentMode).sort(() => Math.random() - 0.5);
+
+        document.getElementById("start-screen").classList.add("hidden");
+        document.getElementById("game-screen").classList.remove("hidden");
+        document.getElementById("player-display").innerText = `${userProfile.name}`;
+        document.getElementById("score-display").innerText = "Session Profit: $0";
+
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        clearInterval(timer);
+        hintUsed = false;
+        
+        const hintBtn = document.getElementById("hint-btn");
+        hintBtn.disabled = score < 30; 
+        hintBtn.style.opacity = score < 30 ? "0.3" : "1";
+
+        if (currentQuestionIndex >= gameQuestions.length) {
+            showGameAlert("Market Conquered", "You've completed all available strategies!", () => endGame(true));
+            return;
+        }
+
+        let q = gameQuestions[currentQuestionIndex];
+        document.getElementById("question-number").innerText = `Strategy ${currentQuestionIndex + 1}`;
+        document.getElementById("question-text").innerText = q.question;
+
+        let container = document.getElementById("options-container");
+        container.innerHTML = "";
+
+        q.options.forEach((opt, i) => {
+            let btn = document.createElement("button");
+            btn.className = "option-btn";
+            btn.innerHTML = `<span>${opt}</span>`;
+            btn.onclick = () => selectAnswer(i);
+            container.appendChild(btn);
+        });
+
+        startTimer();
+    }
+
+    function startTimer() {
+        timeLeft = TIME_LIMIT;
+        document.getElementById("time-left").innerText = timeLeft;
+        document.getElementById("timer-fill").style.width = "100%";
+
+        timer = setInterval(() => {
+            timeLeft--;
+            document.getElementById("time-left").innerText = timeLeft;
+            document.getElementById("timer-fill").style.width = (timeLeft / TIME_LIMIT * 100) + "%";
+
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                document.querySelectorAll(".option-btn").forEach(btn => btn.classList.add("disabled-btn"));
+                showGameAlert("Market Closed", "Time is up! Your portfolio has been liquidated.", () => { endGame(false); });
+            }
+        }, 1000);
+    }
+
+    function selectAnswer(index) {
+        clearInterval(timer);
+        let q = gameQuestions[currentQuestionIndex];
+        let buttons = document.querySelectorAll(".option-btn");
+        buttons.forEach(btn => btn.classList.add("disabled-btn"));
+
+        if (index === q.answer) {
+            buttons[index].classList.add("correct");
+            let speedBonus = Math.floor(timeLeft / 2);
+            score += (10 + speedBonus);
+            document.getElementById("score-display").innerText = `Session Profit: $${score}`;
+            
+            setTimeout(() => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex >= gameQuestions.length) {
+                    showGameAlert("Market Conquered", "You've completed all available strategies!", () => endGame(true));
+                } else {
+                    loadQuestion();
+                }
+            }, 800);
+        } else {
+            buttons[index].classList.add("wrong");
+            buttons[q.answer].classList.add("correct"); 
+            setTimeout(() => {
+                showGameAlert("Bad Investment", "Wrong strategy chosen! You have been eliminated from the market.", () => { endGame(false); });
+            }, 1000);
+        }
+    }
+
+    function useHint() {
+        if (hintUsed || score < 30) {
+            if(score < 30) showGameAlert("Insufficient Funds", "You need a Session Profit of at least $30 to buy Insider Intel.");
+            else showGameAlert("Intel Exhausted", "You have already used your hint for this round.");
+            return;
+        }
+        
+        score -= 30;
+        document.getElementById("score-display").innerText = `Session Profit: $${score}`;
+        
+        let q = gameQuestions[currentQuestionIndex];
+        let buttons = document.querySelectorAll(".option-btn");
+        let wrong = [];
+
+        buttons.forEach((b, i) => { if (i !== q.answer) wrong.push(i); });
+        wrong.sort(() => Math.random() - 0.5);
+
+        buttons[wrong[0]].style.opacity = "0";
+        buttons[wrong[1]].style.opacity = "0";
+        setTimeout(() => {
+            buttons[wrong[0]].style.visibility = "hidden";
+            buttons[wrong[1]].style.visibility = "hidden";
+        }, 300);
+
+        hintUsed = true;
+        document.getElementById("hint-btn").disabled = true;
+    }
+
+    function endGame(completed) {
+        document.getElementById("game-screen").classList.add("hidden");
+        const resultScreen = document.getElementById("result-screen");
+        resultScreen.classList.remove("hidden");
+        
+        document.getElementById("end-title").innerText = completed ? "Ascended to the 1%" : "Portfolio Liquidated";
+        document.getElementById("end-title").style.color = completed ? "#2ecc71" : "var(--primary-red)";
+
+        let rankText = "Liquidity Provider";
+        if (score > 150) rankText = "Hedge Fund Manager";
+        else if (score > 80) rankText = "Institutional Investor";
+        else if (score > 40) rankText = "Retail Trader";
+        document.getElementById("final-rank").innerText = rankText;
+
+        userProfile.totalWealth += score;
+        saveProfile();
+
+        let currentDisplay = 0;
+        let finalScoreEl = document.getElementById("final-score");
+        let duration = 1000; 
+        let startTime = null;
+
+        function animateScore(timestamp) {
+            if (!startTime) startTime = timestamp;
+            let progress = timestamp - startTime;
+            let percentage = Math.min(progress / duration, 1);
+            let easeOutQuart = 1 - Math.pow(1 - percentage, 4);
+            currentDisplay = Math.floor(easeOutQuart * score);
+            
+            finalScoreEl.innerText = `$${currentDisplay}`;
+            if (percentage < 1) requestAnimationFrame(animateScore);
+            else document.getElementById("final-career-wealth").innerText = `$${userProfile.totalWealth.toLocaleString()}`;
+        }
+        requestAnimationFrame(animateScore);
+    }
+
+    function restartGame() {
+        document.getElementById("result-screen").classList.add("hidden");
+        document.getElementById("start-screen").classList.remove("hidden");
+        document.getElementById("welcome-text").innerText = `Trader: ${userProfile.name}`;
+        document.getElementById("career-wealth-text").innerText = `$${userProfile.totalWealth.toLocaleString()}`;
+    }
+    // NEW: Quit Game Function
+    function quitGame() {
+        // Stop the timer
+        clearInterval(timer);
+        
+        // Hide the game screen and show the start screen
+        document.getElementById("game-screen").classList.add("hidden");
+        document.getElementById("start-screen").classList.remove("hidden");
+        
+        // Refresh the dashboard to ensure their Career Wealth displays correctly
+        document.getElementById("welcome-text").innerText = `Trader: ${userProfile.name}`;
+        document.getElementById("career-wealth-text").innerText = `$${userProfile.totalWealth.toLocaleString()}`;
+    }
+
+</script>
+</body>
+</html>
